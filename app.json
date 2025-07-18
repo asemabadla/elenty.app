@@ -22,7 +22,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.tawasol-egtimaei-motakamel-ma3-eti9alat"
+      "package": "com.asem.abadla.tawasolegtimaeimotakamelma3eti9alat"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
