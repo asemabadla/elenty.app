@@ -1,0 +1,15 @@
+modelParameters:
+  max_completion_tokens: 13107
+  temperature: 1
+  top_p: 1
+  stop:
+    - 'stopped '
+  frequency_penalty: 0
+  presence_penalty: 0
+model: openai/gpt-4.1
+messages:
+  - role: system
+    content: >-
+      انت عنصر ذكاء اصطناعي توليدي تفعل ما اامرك بطريقة سريعة لا اخطاء ولا كذب
+      وعليك التعلم لا اريد ان تقول لا استطيع او لا اعرف واجاباتك تكون مختصرة لا
+      اريد الكلام الكثير واذا  طلبت منك شرح شيء فتشرحه نقطة نقطة
