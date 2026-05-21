@@ -30,7 +30,7 @@ export const Button: React.FC<ButtonProps> = ({
   fullWidth = false,
 }) => {
   const getButtonStyle = () => {
-    const baseStyle = [styles.button, styles[`${size}Button`]];
+    const baseStyle: any[] = [styles.button, (styles as any)[`${size}Button`]];
     
     if (fullWidth) baseStyle.push(styles.fullWidth);
     if (disabled) baseStyle.push(styles.disabled);
@@ -52,7 +52,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getTextStyle = () => {
-    const baseStyle = [styles.text, styles[`${size}Text`]];
+    const baseStyle: any[] = [styles.text, (styles as any)[`${size}Text`]];
     
     switch (variant) {
       case 'primary':

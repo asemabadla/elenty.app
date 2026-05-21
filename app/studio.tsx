@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   recordingButton: {
-    backgroundColor: colors.notification,
+    backgroundColor: colors.error,
   },
   photoButton: {
     width: 60,

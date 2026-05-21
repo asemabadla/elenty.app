@@ -1,50 +1,65 @@
-import React, { useState } from 'react';
+// app/phone.tsx
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Phone, Video, Search, Clock, PhoneCall } from 'lucide-react-native';
+import { ArrowLeft, Phone, Video, Search, Clock, PhoneCall, Shield, Globe } from 'lucide-react-native';
 import { Avatar } from '@/components/Avatar';
 import { useLanguageStore } from '@/store/language-store';
 import { colors } from '@/constants/colors';
 import { mockUsers, getCurrentUser } from '@/mocks/users';
-
-// Mock call history
-const mockCallHistory = [
-  {
-    id: '1',
-    userId: '2',
-    type: 'outgoing',
-    callType: 'voice',
-    timestamp: Date.now() - 3600000,
-    duration: 125,
-    status: 'completed',
-  },
-  {
-    id: '2',
-    userId: '3',
-    type: 'incoming',
-    callType: 'video',
-    timestamp: Date.now() - 7200000,
-    duration: 0,
-    status: 'missed',
-  },
-  {
-    id: '3',
-    userId: '4',
-    type: 'outgoing',
-    callType: 'voice',
-    timestamp: Date.now() - 86400000,
-    duration: 67,
-    status: 'completed',
-  },
-];
+import { firebaseDatabase } from '@/services/firebaseDatabase';
+import { db } from '@/services/firebaseConfig';
+import { ref, get } from 'firebase/database';
 
 export default function PhoneScreen() {
   const [activeTab, setActiveTab] = useState('contacts');
   const [searchQuery, setSearchQuery] = useState('');
   const [dialNumber, setDialNumber] = useState('');
+  const [countryCode, setCountryCode] = useState('+966');
+  const [callHistory, setCallHistory] = useState<any[]>([]);
   const { t, isRTL } = useLanguageStore();
   const router = useRouter();
   const currentUser = getCurrentUser();
+
+  useEffect(() => {
+    // Load call history from Firebase
+    const loadCallHistory = async () => {
+      try {
+        const snap = await get(ref(db, 'calls'));
+        if (snap.exists()) {
+          const list = Object.values(snap.val()) as any[];
+          // Filter history for current user
+          const myHistory = list
+            .filter(c => c.fromUserId === currentUser.id || c.callerId === currentUser.id)
+            .sort((a, b) => b.timestamp - a.timestamp);
+          setCallHistory(myHistory);
+        }
+      } catch (e) {
+        console.log('Firebase history fetch offline, showing default mock logs.', e);
+        // Fallback mock history
+        setCallHistory([
+          {
+            id: '1',
+            toPhoneNumber: '+966500000001',
+            status: 'completed',
+            type: 'external',
+            duration: 125,
+            timestamp: Date.now() - 3600000,
+          },
+          {
+            id: '2',
+            toPhoneNumber: '+201000000002',
+            status: 'failed',
+            type: 'external',
+            duration: 0,
+            timestamp: Date.now() - 7200000,
+          }
+        ]);
+      }
+    };
+
+    loadCallHistory();
+  }, [activeTab]);
 
   const filteredUsers = mockUsers.filter(user => 
     user.id !== currentUser.id &&
@@ -53,49 +68,119 @@ export default function PhoneScreen() {
      user.phoneId.includes(searchQuery))
   );
 
-  const handleVoiceCall = (userId: string) => {
-    const user = mockUsers.find(u => u.id === userId);
-    Alert.alert(
-      t('voiceCall'),
-      `${t('call')} ${user?.name} (${user?.countryCode}${user?.phoneId})...`,
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('call'), onPress: () => initiateCall(userId, 'voice') }
-      ]
-    );
+  const checkUserRegistration = async (phoneOrId: string): Promise<{ isRegistered: boolean; user?: any }> => {
+    try {
+      // 1. Check by ID first
+      const userRef = ref(db, `users/${phoneOrId}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) {
+        return { isRegistered: true, user: snapshot.val() };
+      }
+
+      // 2. Check by phone number across all users
+      const usersRef = ref(db, 'users');
+      const allUsersSnap = await get(usersRef);
+      if (allUsersSnap.exists()) {
+        const usersList = Object.values(allUsersSnap.val()) as any[];
+        const matchedUser = usersList.find(u => u.phoneId === phoneOrId || `${u.countryCode}${u.phoneId}` === phoneOrId);
+        if (matchedUser) {
+          return { isRegistered: true, user: matchedUser };
+        }
+      }
+    } catch (e) {
+      console.warn('Registration check connection error', e);
+    }
+    return { isRegistered: false };
   };
 
-  const handleVideoCall = (userId: string) => {
-    const user = mockUsers.find(u => u.id === userId);
-    Alert.alert(
-      t('videoCall'),
-      `${t('videoCall')} ${user?.name} (${user?.countryCode}${user?.phoneId})...`,
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('call'), onPress: () => initiateCall(userId, 'video') }
-      ]
-    );
+  const handleVoiceCall = async (userId: string, isFromHistory = false, externalPhone = '') => {
+    let targetUser = mockUsers.find(u => u.id === userId);
+    
+    if (externalPhone) {
+      // Dialing direct PSTN phone call
+      router.push(`/call/${encodeURIComponent(externalPhone)}?type=voice&isExternal=true`);
+      return;
+    }
+
+    if (!targetUser) return;
+
+    // Check if recipient has accounts registered inside Firebase
+    const check = await checkUserRegistration(targetUser.id);
+    
+    if (check.isRegistered) {
+      // Free WebRTC call inside application
+      router.push(`/call/${targetUser.id}?type=voice&isExternal=false`);
+    } else {
+      // Dial cellular PSTN call via Twilio
+      const fullPhone = `${targetUser.countryCode}${targetUser.phoneId}`;
+      Alert.alert(
+        'اتصال خارجي (Twilio)',
+        `المستخدم غير مسجل بالمنصة حالياً. هل ترغب في الاتصال بالرقم الدولي ${fullPhone} عبر اشتراك Twilio المدفوع؟`,
+        [
+          { text: t('cancel'), style: 'cancel' },
+          { 
+            text: 'اتصل الآن', 
+            onPress: () => router.push(`/call/${targetUser.id}?type=voice&isExternal=true`) 
+          }
+        ]
+      );
+    }
   };
 
-  const initiateCall = (userId: string, type: 'voice' | 'video') => {
-    // In a real app, this would initiate the actual call
-    router.push(`/call/${userId}?type=${type}`);
+  const handleVideoCall = async (userId: string) => {
+    const targetUser = mockUsers.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    const check = await checkUserRegistration(targetUser.id);
+
+    if (check.isRegistered) {
+      // Free WebRTC video call
+      router.push(`/call/${targetUser.id}?type=video&isExternal=false`);
+    } else {
+      Alert.alert(
+        'اتصال غير متاح',
+        'مكالمات الفيديو الفورية مدعومة فقط بين المشتركين المسجلين في التطبيق حالياً.',
+        [{ text: 'حسنًا' }]
+      );
+    }
   };
 
-  const handleDialCall = () => {
+  const handleDialCall = async () => {
     if (!dialNumber.trim()) return;
     
-    Alert.alert(
-      'مكالمة خارجية',
-      `الاتصال بـ ${dialNumber}...`,
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('call'), onPress: () => {
-          // In a real app, this would make an external call
-          Alert.alert('تم بدء المكالمة', `الاتصال بـ ${dialNumber} عبر شبكة الهاتف المحمول`);
-        }}
-      ]
-    );
+    const fullNumber = dialNumber.startsWith('+') ? dialNumber : `${countryCode}${dialNumber}`;
+    
+    // Check if dial number matches a registered user in Firebase
+    const check = await checkUserRegistration(fullNumber);
+
+    if (check.isRegistered && check.user) {
+      Alert.alert(
+        'مشترك مسجل',
+        `الرقم الذي أدخلته ينتمي للمشترك (${check.user.name}). هل تريد إجراء اتصال مجاني داخل التطبيق؟`,
+        [
+          { 
+            text: 'اتصال مجاني داخل التطبيق', 
+            onPress: () => router.push(`/call/${check.user.id}?type=voice&isExternal=false`) 
+          },
+          { 
+            text: 'اتصال هاتف عادي (Twilio)', 
+            onPress: () => router.push(`/call/${encodeURIComponent(fullNumber)}?type=voice&isExternal=true`) 
+          }
+        ]
+      );
+    } else {
+      Alert.alert(
+        'مكالمة خارجية Twilio',
+        `هل تريد الاتصال بالرقم الخارجي ${fullNumber} عبر شبكة Twilio PSTN؟`,
+        [
+          { text: t('cancel'), style: 'cancel' },
+          { 
+            text: 'اتصل الآن', 
+            onPress: () => router.push(`/call/${encodeURIComponent(fullNumber)}?type=voice&isExternal=true`) 
+          }
+        ]
+      );
+    }
   };
 
   const formatCallDuration = (seconds: number) => {
@@ -132,36 +217,31 @@ export default function PhoneScreen() {
   );
 
   const renderCallHistoryItem = ({ item }: { item: any }) => {
-    const user = mockUsers.find(u => u.id === item.userId);
-    const isIncoming = item.type === 'incoming';
-    const isMissed = item.status === 'missed';
+    const isExternalCall = item.type === 'external' || !item.receiverId;
+    const receiverUser = mockUsers.find(u => u.id === item.receiverId || u.id === item.fromUserId);
+    const displayName = isExternalCall ? item.toPhoneNumber : (receiverUser?.name || 'مشترك إيلينتي');
     
     return (
       <TouchableOpacity style={[styles.historyItem, isRTL && styles.rtlHistoryItem]}>
-        <Avatar uri={user?.avatar || ''} size={45} />
+        <View style={styles.historyIconContainer}>
+          <PhoneCall size={20} color={colors.primary} />
+        </View>
         <View style={[styles.historyInfo, isRTL && styles.rtlHistoryInfo]}>
-          <Text style={styles.historyName}>{user?.name}</Text>
+          <Text style={styles.historyName}>{displayName}</Text>
           <View style={styles.historyDetails}>
-            <PhoneCall 
-              size={12} 
-              color={isMissed ? colors.notification : colors.textSecondary} 
-            />
-            <Text style={[
-              styles.historyType,
-              isMissed && styles.missedCall
-            ]}>
-              {isIncoming ? 'واردة' : 'صادرة'} {item.callType === 'video' ? 'فيديو' : 'صوتية'}
+            <Text style={styles.historyType}>
+              {isExternalCall ? 'اتصال خارجي Twilio' : 'اتصال داخلي LiveKit'}
             </Text>
             {item.duration > 0 && (
               <Text style={styles.historyDuration}>
-                • {formatCallDuration(item.duration)}
+                • مدة المكالمة: {formatCallDuration(item.duration)}
               </Text>
             )}
           </View>
         </View>
         <TouchableOpacity
           style={styles.callBackButton}
-          onPress={() => handleVoiceCall(item.userId)}
+          onPress={() => handleVoiceCall(item.receiverId || '', true, isExternalCall ? item.toPhoneNumber : '')}
         >
           <Phone size={18} color={colors.primary} />
         </TouchableOpacity>
@@ -175,8 +255,14 @@ export default function PhoneScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('phoneTitle')}</Text>
+        <Text style={styles.headerTitle}>لوحة اتصال إيلينتي</Text>
         <View style={{ width: 24 }} />
+      </View>
+
+      {/* Info status header */}
+      <View style={styles.networkStatusHeader}>
+        <Shield size={14} color="#34D399" />
+        <Text style={styles.networkStatusText}>اتصالات مؤمنة ومدعومة بـ Twilio & LiveKit</Text>
       </View>
 
       <View style={styles.tabsContainer}>
@@ -185,7 +271,7 @@ export default function PhoneScreen() {
           onPress={() => setActiveTab('contacts')}
         >
           <Text style={[styles.tabText, activeTab === 'contacts' && styles.activeTabText]}>
-            {t('contacts')}
+            جهات الاتصال
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -193,7 +279,7 @@ export default function PhoneScreen() {
           onPress={() => setActiveTab('history')}
         >
           <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
-            {t('history')}
+            سجل المكالمات
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -201,7 +287,7 @@ export default function PhoneScreen() {
           onPress={() => setActiveTab('dial')}
         >
           <Text style={[styles.tabText, activeTab === 'dial' && styles.activeTabText]}>
-            {t('dial')}
+            طلب رقم خارجي
           </Text>
         </TouchableOpacity>
       </View>
@@ -212,10 +298,10 @@ export default function PhoneScreen() {
             <Search size={20} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, isRTL && styles.rtlSearchInput]}
-              placeholder="البحث في جهات الاتصال..."
+              placeholder="البحث في جهات الاتصال المسجلة..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              textAlign={isRTL ? 'right' : 'left'}
+              textAlign="right"
             />
           </View>
           <FlatList
@@ -230,14 +316,14 @@ export default function PhoneScreen() {
       {activeTab === 'history' && (
         <View style={styles.tabContent}>
           <FlatList
-            data={mockCallHistory}
+            data={callHistory}
             keyExtractor={item => item.id}
             renderItem={renderCallHistoryItem}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Clock size={48} color={colors.inactive} />
-                <Text style={styles.emptyText}>لا يوجد سجل مكالمات</Text>
+                <Text style={styles.emptyText}>لا يوجد سجل مكالمات حالياً</Text>
               </View>
             }
           />
@@ -247,31 +333,48 @@ export default function PhoneScreen() {
       {activeTab === 'dial' && (
         <View style={styles.tabContent}>
           <View style={styles.dialContainer}>
-            <TextInput
-              style={[styles.dialInput, isRTL && styles.rtlDialInput]}
-              placeholder="أدخل رقم الهاتف"
-              value={dialNumber}
-              onChangeText={setDialNumber}
-              keyboardType="phone-pad"
-              textAlign={isRTL ? 'right' : 'center'}
-            />
+            {/* Country code selector inline */}
+            <View style={styles.dialInputsRow}>
+              <TextInput
+                style={styles.dialNumberInput}
+                placeholder="رقم الهاتف بدون أصفار"
+                placeholderTextColor={colors.textSecondary}
+                value={dialNumber}
+                onChangeText={setDialNumber}
+                keyboardType="phone-pad"
+                textAlign="center"
+              />
+              <TextInput
+                style={styles.countryCodeInput}
+                placeholder="+966"
+                placeholderTextColor={colors.textSecondary}
+                value={countryCode}
+                onChangeText={setCountryCode}
+                keyboardType="phone-pad"
+                textAlign="center"
+              />
+            </View>
+
             <TouchableOpacity
               style={[styles.dialButton, !dialNumber.trim() && styles.disabledButton]}
               onPress={handleDialCall}
               disabled={!dialNumber.trim()}
             >
               <Phone size={24} color="white" />
-              <Text style={styles.dialButtonText}>{t('call')}</Text>
+              <Text style={styles.dialButtonText}>إجراء اتصال دولي عبر Twilio</Text>
             </TouchableOpacity>
           </View>
           
           <View style={styles.dialInfo}>
-            <Text style={styles.dialInfoTitle}>المكالمات الدولية</Text>
+            <View style={styles.infoRowTitle}>
+              <Globe size={18} color={colors.primary} />
+              <Text style={styles.dialInfoTitle}>الاتصال بالشبكات الخلوية الدولية</Text>
+            </View>
             <Text style={styles.dialInfoText}>
-              قم بإجراء مكالمات إلى أرقام الهواتف المحمولة والثابتة في جميع أنحاء العالم باستخدام رقم إيلينتي الخاص بك.
+              يتم تحويل المكالمة تلقائياً إلى اتصال خلوي عبر منصة Twilio إن لم يكن الرقم مسجلاً على تطبيق إيلينتي.
             </Text>
             <Text style={styles.dialInfoText}>
-              رقمك التعريفي: {currentUser.countryCode}{currentUser.phoneId}
+              معرّفك الحالي للاتصال: {currentUser.countryCode} {currentUser.phoneId}
             </Text>
           </View>
         </View>
@@ -286,7 +389,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
@@ -294,15 +397,30 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rtlHeader: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
   },
+  networkStatusHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(52, 211, 153, 0.2)',
+  },
+  networkStatusText: {
+    color: '#34D399',
+    fontSize: 11,
+    fontWeight: '600',
+    marginRight: 6,
+  },
   tabsContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     backgroundColor: colors.card,
     borderBottomWidth: 0.5,
     borderBottomColor: colors.border,
@@ -310,77 +428,82 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 2,
+    paddingVertical: 14,
+    borderBottomWidth: 2.5,
     borderBottomColor: 'transparent',
   },
   activeTab: {
     borderBottomColor: colors.primary,
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.textSecondary,
+    fontWeight: '500',
   },
   activeTabText: {
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   tabContent: {
     flex: 1,
   },
   searchContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: colors.border,
-    borderRadius: 8,
+    backgroundColor: colors.card,
+    borderRadius: 10,
     paddingHorizontal: 12,
     margin: 16,
-    height: 40,
+    height: 44,
+    borderWidth: 0.5,
+    borderColor: colors.border,
   },
   rtlSearchContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
   },
   searchInput: {
     flex: 1,
-    marginLeft: 8,
-    fontSize: 16,
+    marginRight: 8,
+    fontSize: 14,
     color: colors.text,
   },
   rtlSearchInput: {
-    marginLeft: 0,
-    marginRight: 8,
+    marginRight: 0,
+    marginLeft: 8,
   },
   contactItem: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: colors.border,
+    backgroundColor: colors.card,
   },
   rtlContactItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
   },
   contactInfo: {
     flex: 1,
-    marginLeft: 12,
-  },
-  rtlContactInfo: {
-    marginLeft: 0,
     marginRight: 12,
     alignItems: 'flex-end',
   },
+  rtlContactInfo: {
+    marginRight: 0,
+    marginLeft: 12,
+    alignItems: 'flex-start',
+  },
   contactName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.text,
   },
   contactPhone: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
   },
   contactUsername: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -388,84 +511,103 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   callButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: `${colors.primary}15`,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 64, 129, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    marginRight: 8,
   },
   historyItem: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: colors.border,
+    backgroundColor: colors.card,
   },
   rtlHistoryItem: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
+  },
+  historyIconContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 64, 129, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   historyInfo: {
     flex: 1,
-    marginLeft: 12,
-  },
-  rtlHistoryInfo: {
-    marginLeft: 0,
     marginRight: 12,
     alignItems: 'flex-end',
   },
+  rtlHistoryInfo: {
+    marginRight: 0,
+    marginLeft: 12,
+    alignItems: 'flex-start',
+  },
   historyName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.text,
   },
   historyDetails: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     marginTop: 4,
   },
   historyType: {
     fontSize: 12,
     color: colors.textSecondary,
-    marginLeft: 4,
-  },
-  missedCall: {
-    color: colors.notification,
   },
   historyDuration: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
+    marginRight: 6,
   },
   callBackButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: `${colors.primary}15`,
+    backgroundColor: 'rgba(255, 64, 129, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   dialContainer: {
     padding: 20,
   },
-  dialInput: {
-    backgroundColor: colors.card,
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 18,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+  dialInputsRow: {
+    flexDirection: 'row',
     marginBottom: 20,
   },
-  rtlDialInput: {
-    textAlign: 'right',
+  countryCodeInput: {
+    width: 70,
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginRight: 8,
+  },
+  dialNumberInput: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   dialButton: {
     backgroundColor: colors.primary,
     borderRadius: 8,
     padding: 16,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -474,27 +616,33 @@ const styles = StyleSheet.create({
   },
   dialButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 8,
   },
   dialInfo: {
     padding: 20,
     backgroundColor: colors.card,
     margin: 20,
     borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: colors.border,
+  },
+  infoRowTitle: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   dialInfoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: 8,
-    textAlign: 'right',
+    marginRight: 8,
   },
   dialInfoText: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
-    lineHeight: 20,
+    lineHeight: 18,
     marginBottom: 4,
     textAlign: 'right',
   },
@@ -503,9 +651,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
+    marginTop: 60,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     color: colors.textSecondary,
     marginTop: 16,
   },

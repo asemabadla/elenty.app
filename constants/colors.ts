@@ -80,7 +80,7 @@ export const typography = {
     medium: '500',
     semibold: '600',
     bold: '700',
-  },
+  } as const,
   lineHeights: {
     tight: 1.2,
     normal: 1.4,

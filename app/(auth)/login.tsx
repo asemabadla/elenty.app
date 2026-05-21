@@ -24,7 +24,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      await login();
+      await login(phoneId, password);
     } catch (error) {
       console.error(error);
     } finally {

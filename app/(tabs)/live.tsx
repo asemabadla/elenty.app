@@ -117,7 +117,7 @@ export default function LiveScreen() {
         <Button
           title="Go Live"
           onPress={handleGoLive}
-          size="small"
+          size="sm"
           icon={<Radio size={16} color="white" />}
         />
       </View>
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.notification,
+    backgroundColor: colors.error,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,

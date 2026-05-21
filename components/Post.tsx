@@ -60,7 +60,7 @@ export const Post: React.FC<PostProps> = ({ post, onPress }) => {
       >
         <Image
           source={{ uri: post.media[0].url }}
-          style={styles.image}
+          style={styles.image as any}
           contentFit="cover"
           transition={300}
         />

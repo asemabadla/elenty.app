@@ -70,7 +70,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive }) => 
             <Heart
               size={30}
               color="white"
-              fill={video.hasLiked ? colors.notification : 'transparent'}
+              fill={video.hasLiked ? colors.error : 'transparent'}
             />
             <Text style={styles.controlText}>{video.likes}</Text>
           </TouchableOpacity>

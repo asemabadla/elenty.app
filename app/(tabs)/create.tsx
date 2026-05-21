@@ -36,7 +36,7 @@ export default function CreateScreen() {
       id: 'live',
       title: 'Go Live',
       subtitle: 'Stream live video',
-      icon: <Video size={24} color={colors.notification} />,
+      icon: <Video size={24} color={colors.error} />,
       action: () => router.push('/live-studio'),
     },
     {
