@@ -2,12 +2,15 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useBackend } from '@/hooks/use-backend';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync();
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -16,7 +19,9 @@ export default function RootLayout() {
   useBackend();
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    if (Platform.OS !== 'web') {
+      SplashScreen.hideAsync();
+    }
   }, []);
 
   return (
