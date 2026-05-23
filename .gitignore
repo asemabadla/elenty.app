@@ -47,6 +47,9 @@ build/
 .next/
 out/
 
+# Ignore large APK files
+assets/images/*.apk
+
 # Native
 *.orig.*
 *.jks
