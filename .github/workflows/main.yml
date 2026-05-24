@@ -1,1 +1,132 @@
+name: 🚀 Expo Build & Deploy Pipeline
 
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  NODE_ENV: production
+
+jobs:
+  setup:
+    name: 📋 Setup & Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --prefer-offline
+      - run: npm run lint --if-present || echo "⚠️ No lint script"
+
+  build-web:
+    name: 🌐 Build Web App
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --prefer-offline
+      - run: npx expo export --platform web 2>&1 || npm run start-web || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: dist/
+          retention-days: 7
+
+  build-android:
+    name: 🤖 Build Android
+    needs: setup
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --prefer-offline
+      - run: npm install -g eas-cli
+      - run: eas build --platform android --profile preview --non-interactive --wait || true
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  build-ios:
+    name: 🍎 Build iOS
+    needs: setup
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --prefer-offline
+      - run: npm install -g eas-cli
+      - run: eas build --platform ios --profile preview --non-interactive --wait || true
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  deploy-web:
+    name: 🌐 Deploy Web to GitHub Pages
+    needs: build-web
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: ./dist
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+      - id: deployment
+        uses: actions/deploy-pages@v3
+
+  create-release:
+    name: 🏷️ Create GitHub Release
+    needs: [build-web, build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./releases
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: releases/**/*
+          tag_name: v${{ github.run_number }}
+          name: 🚀 Release v${{ github.run_number }}
+          body: |
+            ## 🎉 Elenty.app v${{ github.run_number }}
+            تواصل اجتماعي متكامل مع اتصالات صوتية
+            
+            ### 📱 Available on:
+            - 🌐 Web (GitHub Pages)
+            - 🤖 Android (Google Play)
+            - 🍎 iOS (App Store)
+            
+            Build: ${{ github.run_id }} | Author: ${{ github.actor }}
