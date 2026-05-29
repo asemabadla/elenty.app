@@ -12,7 +12,6 @@ on:
   workflow_dispatch:
 
 env:
-  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   NODE_ENV: production
 
 jobs:
@@ -39,7 +38,14 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci --prefer-offline
-      - run: npx expo export --platform web 2>&1 || npm run start-web || true
+      - run: npx expo export --platform web || npm run start-web
+      - name: Verify build output
+        run: |
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
+            echo "❌ Build failed: dist directory not found or empty"
+            exit 1
+          fi
+          echo "✅ Build output verified"
       - uses: actions/upload-artifact@v4
         with:
           name: web-build
