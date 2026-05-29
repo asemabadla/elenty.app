@@ -5,7 +5,8 @@
   "scripts": {
     "start": "bunx rork start -p vtv48uoxwqak832b0jv8f --tunnel",
     "start-web": "bunx rork start -p vtv48uoxwqak832b0jv8f --web --tunnel",
-    "start-web-dev": "DEBUG=expo* bunx rork start -p vtv48uoxwqak832b0jv8f --web --tunnel"
+    "start-web-dev": "DEBUG=expo* bunx rork start -p vtv48uoxwqak832b0jv8f --web --tunnel",
+    "build": "webpack"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -47,7 +48,9 @@
     "@babel/core": "^7.25.2",
     "@expo/ngrok": "^4.1.0",
     "@types/react": "~19.0.10",
-    "typescript": "~5.8.3"
+    "typescript": "~5.8.3",
+    "webpack": "^5.94.0",
+    "webpack-cli": "^5.1.4"
   },
   "private": true
 }
