@@ -65,7 +65,7 @@ export default function CreateScreen() {
       title: 'Challenge',
       subtitle: 'Start a trend',
       icon: <Sparkles size={24} color={colors.secondary} />,
-      action: () => router.push('/challenges/create'),
+      action: () => router.push('/challenges/create' as any),
     },
   ];
 

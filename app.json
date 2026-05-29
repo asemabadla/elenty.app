@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "تواصل اجتماعي متكامل مع اتصالات صوتية",
-    "slug": "tawasol-egtimaei-motakamel-ma3-eti9alat",
+    "name": "Elenty.app",
+    "slug": "elentyapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -43,7 +43,7 @@
         "origin": "https://rork.com/"
       },
       "eas": {
-        "projectId": "62434bba-7f64-4749-8940-c56b2761ae2a"
+        "projectId": "da77a01e-f338-400b-b32a-0954758bb189"
       }
     },
     "owner": "asem.abadla"

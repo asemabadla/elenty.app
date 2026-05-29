@@ -27,7 +27,7 @@ export default function CallScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [twilioCallId, setTwilioCallId] = useState<string | null>(null);
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Retrieve receiver details
   const receiver = mockUsers.find(u => u.id === receiverId) || {

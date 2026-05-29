@@ -56,11 +56,11 @@ export default function ChallengesScreen() {
   const router = useRouter();
 
   const handleChallengePress = (challengeId: string) => {
-    router.push(`/challenge/${challengeId}`);
+    router.push(`/challenge/${challengeId}` as any);
   };
 
   const handleCreateChallenge = () => {
-    router.push('/challenges/create');
+    router.push('/challenges/create' as any);
   };
 
   const renderChallengeItem = ({ item }: { item: any }) => (
