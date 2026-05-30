@@ -65,7 +65,7 @@ jobs:
           cache: npm
       - run: npm ci --prefer-offline
       - run: npm install -g eas-cli
-      - run: eas build --platform android --profile preview --non-interactive --wait || true
+      - run: eas build --platform android --profile production --non-interactive --wait
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
@@ -82,7 +82,7 @@ jobs:
           cache: npm
       - run: npm ci --prefer-offline
       - run: npm install -g eas-cli
-      - run: eas build --platform ios --profile preview --non-interactive --wait || true
+      - run: eas build --platform ios --profile production --non-interactive --wait
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
@@ -94,9 +94,7 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    environment: production
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -122,17 +120,3 @@ jobs:
         with:
           path: ./releases
       - uses: softprops/action-gh-release@v1
-        with:
-          files: releases/**/*
-          tag_name: v${{ github.run_number }}
-          name: 🚀 Release v${{ github.run_number }}
-          body: |
-            ## 🎉 Elenty.app v${{ github.run_number }}
-            تواصل اجتماعي متكامل مع اتصالات صوتية
-            
-            ### 📱 Available on:
-            - 🌐 Web (GitHub Pages)
-            - 🤖 Android (Google Play)
-            - 🍎 iOS (App Store)
-            
-            Build: ${{ github.run_id }} | Author: ${{ github.actor }}
