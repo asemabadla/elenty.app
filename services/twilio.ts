@@ -1,6 +1,7 @@
 // services/twilio.ts
 import { db } from './firebaseConfig';
 import { ref, push, set } from 'firebase/database';
+import { base64Encode } from '@/utils/base64';
 
 interface TwilioConfig {
   accountSid?: string;
@@ -53,7 +54,7 @@ class TwilioService {
         const url = `https://api.twilio.com/2010-04-01/Accounts/${this.config.accountSid}/Calls.json`;
         
         // Setup basic authorization headers
-        const authHeader = 'Basic ' + btoa(`${this.config.accountSid}:${this.config.authToken}`);
+        const authHeader = 'Basic ' + base64Encode(`${this.config.accountSid}:${this.config.authToken}`);
         
         const response = await fetch(url, {
           method: 'POST',

@@ -22,11 +22,11 @@ export default function StoryScreen() {
   useEffect(() => {
     if (!story) return;
 
+    setProgress(0);
+
     const interval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 1) {
-          clearInterval(interval);
-          setTimeout(() => router.back(), 500);
           return 1;
         }
         return prev + 0.01;
@@ -34,7 +34,16 @@ export default function StoryScreen() {
     }, 50); // 5 seconds total duration (50ms * 100 steps)
 
     return () => clearInterval(interval);
-  }, [story, router]);
+  }, [story]);
+
+  useEffect(() => {
+    if (progress >= 1) {
+      const timeout = setTimeout(() => {
+        router.back();
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [progress, router]);
 
   if (!story) {
     return (

@@ -1,6 +1,7 @@
 // services/livekit.ts
 import { db } from './firebaseConfig';
 import { ref, set, onValue, off, remove, get } from 'firebase/database';
+import { base64Encode } from '@/utils/base64';
 
 interface LiveKitConfig {
   serverUrl?: string;
@@ -53,7 +54,7 @@ class LiveKitService {
       };
 
       // Lightweight client token representation (base64 encoded JSON)
-      const token = `lk_${btoa(JSON.stringify(payload))}`;
+      const token = `lk_${base64Encode(JSON.stringify(payload))}`;
       return token;
     } else {
       console.log(`[LiveKit Simulation] Creating mock token for Room: ${roomName}, User: ${participantName}`);
