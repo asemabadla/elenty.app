@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "elentyapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,23 +15,24 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.rork.tawasol-egtimaei-motakamel-ma3-eti9alat"
+      "bundleIdentifier": "app.elenty.tawasol"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.asem.abadla.tawasolegtimaeimotakamelma3eti9alat"
+      "package": "app.elenty.tawasol"
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       [
         "expo-router",
         {
-          "origin": "https://rork.com/"
+          "origin": "https://elenty.app/"
         }
       ]
     ],
@@ -40,12 +41,12 @@
     },
     "extra": {
       "router": {
-        "origin": "https://rork.com/"
+        "origin": "https://elenty.app/"
       },
       "eas": {
         "projectId": "da77a01e-f338-400b-b32a-0954758bb189"
       }
     },
-    "owner": "asem.abadla"
+    "owner": "asemabadla"
   }
 }
