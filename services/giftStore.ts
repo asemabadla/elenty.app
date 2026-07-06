@@ -97,6 +97,8 @@ class GiftStoreService {
       await runTransaction(recipientWalletRef, (currentBalance) => {
         const balance = currentBalance === null ? 0 : currentBalance;
         return balance + gift.price;
+      }).catch(e => {
+        console.error('Failed to add coins to recipient:', e);
       });
 
       // Push gift transaction to stream node
@@ -111,6 +113,8 @@ class GiftStoreService {
         fromUserId,
         fromUsername,
         timestamp: Date.now(),
+      }).catch(e => {
+        console.error('Failed to save gift transaction:', e);
       });
 
       // Add notification or chat message inside the stream
@@ -123,6 +127,8 @@ class GiftStoreService {
         message: `${fromUsername} أرسل ${gift.nameAr} ${gift.icon} للمضيف!`,
         timestamp: Date.now(),
         type: 'gift',
+      }).catch(e => {
+        console.error('Failed to save chat message:', e);
       });
 
       return {

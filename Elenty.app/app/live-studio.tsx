@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
@@ -40,16 +40,26 @@ export default function LiveStudioScreen() {
     setIsLive(true);
     setViewers(1);
     
-    // Simulate viewer count increase
+    // Simulate viewer count increase with proper cleanup
     const interval = setInterval(() => {
       setViewers(prev => prev + Math.floor(Math.random() * 3));
     }, 2000);
 
-    // Store interval ID for cleanup
-    setTimeout(() => clearInterval(interval), 60000);
+    // Store interval ID for cleanup when stream ends
+    const timeoutId = setTimeout(() => clearInterval(interval), 600000); // 10 minutes max
+    
+    // Store cleanup function
+    (window as any).__activeStreamInterval = { interval, timeoutId };
   };
 
   const endLiveStream = () => {
+    // Clean up intervals
+    if ((window as any).__activeStreamInterval) {
+      clearInterval((window as any).__activeStreamInterval.interval);
+      clearTimeout((window as any).__activeStreamInterval.timeoutId);
+      delete (window as any).__activeStreamInterval;
+    }
+    
     setIsLive(false);
     setViewers(0);
     Alert.alert('Stream Ended', `Your live stream has ended. You had ${viewers} viewers!`, [

@@ -1,4 +1,3 @@
-// app/live-studio.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Alert, Dimensions, FlatList, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -24,6 +23,7 @@ export default function LiveStudioScreen() {
   
   // Animation states for floating reactions inside the studio
   const [floatingGifts, setFloatingGifts] = useState<{ id: string; emoji: string; anim: Animated.Value }[]>([]);
+  const intervalRef = useRef<any>(null);
 
   const router = useRouter();
   const currentUser = getCurrentUser();
@@ -130,6 +130,12 @@ export default function LiveStudioScreen() {
   };
 
   const endLiveStream = async () => {
+    // Clean up interval if exists
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
     await liveKitService.endRoom(streamId);
     setIsLive(false);
     setViewers(0);
